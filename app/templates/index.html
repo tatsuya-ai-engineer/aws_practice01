@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Azure 時系列予測デモ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 min-h-screen">
+    <div class="max-w-5xl mx-auto py-10 px-4 space-y-8">
+      <header class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold">Azure 時系列予測デモ</h1>
+          <p class="text-sm text-slate-600 mt-1">
+            FastAPI + Tailwind を使ったサンプル UI と推論 API です。
+          </p>
+        </div>
+        <a
+          href="https://learn.microsoft.com/azure/machine-learning/"
+          target="_blank"
+          rel="noreferrer"
+          class="text-sm text-indigo-700 hover:underline"
+        >
+          Azure ML ドキュメント
+        </a>
+      </header>
+
+      <section class="bg-white shadow rounded-lg p-6 space-y-6">
+        <div>
+          <h2 class="text-xl font-semibold">サンプルデータで試す</h2>
+          <p class="text-sm text-slate-600">
+            「サンプル実行」を押すと、API にアクセスして 7 ステップ先までの予測値を取得します。
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button
+            id="run-sample"
+            class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium shadow hover:bg-indigo-500"
+          >
+            サンプル実行
+          </button>
+          <button
+            id="clear"
+            class="px-4 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            クリア
+          </button>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-slate-700">レスポンス</h3>
+          <pre
+            id="response"
+            class="mt-2 bg-slate-900 text-slate-100 rounded-md p-4 text-xs whitespace-pre-wrap min-h-[160px]"
+          >
+まだ実行されていません。
+          </pre>
+        </div>
+      </section>
+
+      <section class="bg-white shadow rounded-lg p-6 space-y-6">
+        <div>
+          <h2 class="text-xl font-semibold">任意の系列を投げる</h2>
+          <p class="text-sm text-slate-600">
+            カンマ区切りの数値を入力して、自由に API を試せます。
+          </p>
+        </div>
+        <form id="custom-form" class="space-y-4">
+          <div>
+            <label for="history" class="block text-sm font-medium text-slate-700"
+              >系列データ (例: <code>100, 105, 110, 115</code>)</label
+            >
+            <input
+              id="history"
+              name="history"
+              type="text"
+              required
+              class="mt-1 block w-full rounded-md border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label for="steps" class="block text-sm font-medium text-slate-700"
+              >予測ステップ数 (1〜50)</label
+            >
+            <input
+              id="steps"
+              name="steps"
+              type="number"
+              min="1"
+              max="50"
+              value="7"
+              class="mt-1 block w-32 rounded-md border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            />
+          </div>
+          <div class="flex gap-3">
+            <button
+              type="submit"
+              class="px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium shadow hover:bg-emerald-500"
+            >
+              API 実行
+            </button>
+            <button
+              type="reset"
+              class="px-4 py-2 rounded-md border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              リセット
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script>
+      const responseEl = document.getElementById("response");
+      const sampleBtn = document.getElementById("run-sample");
+      const clearBtn = document.getElementById("clear");
+      const customForm = document.getElementById("custom-form");
+
+      const renderResponse = (data) => {
+        responseEl.textContent = JSON.stringify(data, null, 2);
+      };
+
+      const renderError = (err) => {
+        responseEl.textContent = `エラーが発生しました: ${err}`;
+      };
+
+      sampleBtn.addEventListener("click", async () => {
+        responseEl.textContent = "実行中...";
+        try {
+          const res = await fetch("/api/sample");
+          const json = await res.json();
+          renderResponse(json);
+        } catch (error) {
+          renderError(error);
+        }
+      });
+
+      clearBtn.addEventListener("click", () => {
+        responseEl.textContent = "まだ実行されていません。";
+      });
+
+      customForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const historyInput = document.getElementById("history").value;
+        const stepsInput = document.getElementById("steps").value;
+        const history = historyInput
+          .split(",")
+          .map((v) => v.trim())
+          .filter((v) => v !== "")
+          .map(Number);
+
+        responseEl.textContent = "実行中...";
+
+        try {
+          const res = await fetch("/api/forecast", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ history, steps: Number(stepsInput) }),
+          });
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`${res.status}: ${errorText}`);
+          }
+
+          const json = await res.json();
+          renderResponse(json);
+        } catch (error) {
+          renderError(error);
+        }
+      });
+    </script>
+  </body>
+</html>
